@@ -1,0 +1,10 @@
+kafka_config:
+  bootstrap_servers: "localhost:9092"
+  group_id: "batch_processor"
+  input_topic: 
+    - "message_input"
+  output_topic: 
+    - "message_output"
+batch_config:
+  batch_size: 1
+  batch_timeout_ms: 1000
