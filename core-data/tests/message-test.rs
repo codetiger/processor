@@ -1,6 +1,5 @@
 use std::fs;
 use core_data::models::message::*;
-use core_data::models::payload::*;
 use serde_json::json;
 
 #[test]

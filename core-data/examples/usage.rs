@@ -1,7 +1,6 @@
 use std::fs;
 use std::time::Instant;
 use core_data::models::message::*;
-use core_data::models::payload::*;
 use serde_json::json;
 
 fn main() {

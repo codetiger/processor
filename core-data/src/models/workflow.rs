@@ -18,6 +18,8 @@ pub struct Workflow {
     pub tasks: Vec<Task>,
 
     pub condition: serde_json::Value,
+
+    pub input_topic: String,
 }
 
 

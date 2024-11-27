@@ -19,6 +19,7 @@ pub struct Task {
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub enum FunctionType {
+    Parse,
     Validate,
     Enrich,
     Publish,

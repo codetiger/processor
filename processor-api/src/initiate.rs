@@ -1,8 +1,7 @@
-use message::Message;
-use payload::PayloadFormat;
+use core_data::models::message::*;
+
 use serde::Serialize;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
-use core_data::models::*;
 use serde_json::json;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::ClientConfig;
@@ -46,11 +45,11 @@ pub async fn initiate_message(
     body: String,
 ) -> impl Responder {
     let initiation_result = tokio::spawn(async move {
-        let payload = core_data::models::payload::Payload::new_inline(
+        let payload = Payload::new_inline(
             Some(body.as_bytes().to_vec()),
             PayloadFormat::Xml,
-            core_data::models::payload::PayloadSchema::ISO20022,
-            core_data::models::payload::Encoding::Utf8,
+            PayloadSchema::ISO20022,
+            Encoding::Utf8,
         );
         let message = Message::new(
             payload,

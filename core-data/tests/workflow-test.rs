@@ -24,6 +24,7 @@ mod tests {
             status: WorkflowStatus::Active,
             tasks: vec![task.clone()],
             condition: json!({"condition": "value"}),
+            input_topic: String::from("input_topic"),
         };
         assert_eq!(workflow.name, String::from("Workflow 1"));
         assert_eq!(workflow.description, String::from("Test workflow"));
@@ -44,6 +45,7 @@ mod tests {
             status: WorkflowStatus::Draft,
             tasks: vec![],
             condition: json!({"condition": "value"}),
+            input_topic: String::from("input_topic"),
         };
         assert_eq!(workflow.name, String::from("Empty Workflow"));
         assert_eq!(workflow.description, String::from("Workflow with no tasks"));
@@ -76,6 +78,7 @@ mod tests {
             status: WorkflowStatus::Draft,
             tasks: vec![task1.clone(), task2.clone()],
             condition: json!({"condition": "value"}),
+            input_topic: String::from("input_topic"),
         };
         assert_eq!(workflow.name, String::from("Workflow with Multiple Tasks"));
         assert_eq!(workflow.description, String::from("Workflow containing multiple tasks"));
