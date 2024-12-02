@@ -20,6 +20,7 @@ fn test_message_lifecycle() {
         "banking".to_string(),
         "pacs.008.001.07".to_string(), 
         "test_message_lifecycle".to_string(),
+        1,
         "ISOOutgoing".to_string(),
         Some("payment".to_string())
     );
@@ -31,6 +32,7 @@ fn test_message_lifecycle() {
     // Stage 2: Parse ISO20022 XML
     message.parse(Some("Parsed payment message".to_string()),
         "test_message_lifecycle".to_string(),
+        1, 
         "ISOOutgoing".to_string(),
     ).expect("Failed to parse message");
 
@@ -44,14 +46,14 @@ fn test_message_lifecycle() {
 
     // Stage 3: Enrich message
     let enrichment_config = vec![
-        EnrichmentConfig {
+        EnrichmentRules {
             field: "data.metadata.processing_date".to_string(),
-            rule: json!({"var": ["processing_date"]}),
+            logic: json!({"var": ["processing_date"]}),
             description: Some("Add processing timestamp".to_string()),
         },
-        EnrichmentConfig {
+        EnrichmentRules {
             field: "data.metadata.message_type".to_string(),
-            rule: json!({"var": ["message_type"]}),
+            logic: json!({"var": ["message_type"]}),
             description: Some("Add message classification".to_string()),
         }
     ];
@@ -66,6 +68,7 @@ fn test_message_lifecycle() {
         enrichment_data,
         Some("Applied metadata enrichment".to_string()),
         "test_message_lifecycle".to_string(),
+        1, 
         "ISOOutgoing".to_string(),
     ).expect("Failed to enrich message");
 

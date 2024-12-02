@@ -1,0 +1,119 @@
+# docker-compose.yml
+networks:
+  payment-network:
+    driver: bridge
+
+services:
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    networks:
+      - payment-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  kafka:
+    image: docker.io/bitnami/kafka:3.9
+    ports:
+      - "9092:9092"
+    volumes:
+      - "kafka_data:/bitnami"
+    healthcheck:
+      test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server kafka:9092 --list" ]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+    networks:
+      - payment-network
+    environment:
+      # KRaft settings
+      - KAFKA_CFG_NODE_ID=0
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+      # Updated listeners configuration
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      # Additional settings remain the same
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_KRAFT_CLUSTER_ID=LeluwGmxT_-GxHijmkqnUQ
+
+  init-kafka:
+    image: docker.io/bitnami/kafka:3.9
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - payment-network
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      '
+      # Wait for Kafka to be ready
+      until kafka-topics.sh --bootstrap-server kafka:9092 --list > /dev/null 2>&1; do
+        echo "Waiting for Kafka to be ready..."
+        sleep 5
+      done
+
+      echo "Creating Kafka topics..."
+      kafka-topics.sh --bootstrap-server kafka:9092 --create \
+        --if-not-exists \
+        --topic payment_incoming \
+        --partitions 1 \
+        --replication-factor 1
+
+      echo "Verifying topics:"
+      kafka-topics.sh --bootstrap-server kafka:9092 --list
+      '
+  processor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: processor
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - payment-network
+    environment:
+      KAFKABOOTSTRAPSERVERS: kafka:9092
+      KAFKAGROUPID: batch_processor
+      BATCHSIZE: 1
+      BATCHTIMEOUTMS: 1000
+      MONGODBURI: mongodb://mongodb:27017
+      MONGODBDATABASE: PaymentProcessor
+      WORKFLOWIDS: payment_processing
+
+  processor-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: processor-api
+    ports:
+      - "8080:8080"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - payment-network
+    environment:
+      SERVERHOSTNAME: 0.0.0.0
+      SERVERPORT: 8080
+      KAFKABOOTSTRAPSERVERS: kafka:9092
+      KAFKAMESSAGETIMEOUTMS: 5000
+      KAFKATOPIC: payment_incoming
+
+volumes:
+  kafka_data:
+    driver: local

@@ -3,5 +3,5 @@ server:
   port: 8080
 kafka:
   bootstrap_servers: "localhost:9092"
-  message_timeout_ms: "5000"
-  topic: "message_input"
+  message_timeout_ms: 5000
+  topic: "payment-incoming"

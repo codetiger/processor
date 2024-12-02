@@ -27,10 +27,13 @@ pub struct Message {
     pub(crate) data: Value,
 
     pub(crate) metadata: Value,
-    
+
     pub(crate) progress: Progress,
 
     pub(crate) audit: Vec<AuditLog>,
+
+    #[serde(skip)]
+    pub(crate) ephemeral_data: Value,
 
     #[serde(skip)]
     pub(crate) transaction_changes: Option<Vec<(String, Value)>>,
@@ -142,7 +145,7 @@ impl Message {
         Ok(())
     }
 
-    pub fn new(payload: Payload, tenant: String, origin: String, workflow: String, task: String, message_alias: Option<String>) -> Self {
+    pub fn new(payload: Payload, tenant: String, origin: String, workflow_id: String, workflow_version: u16, task_id: String, message_alias: Option<String>) -> Self {
         let start_time = OffsetDateTime::now_utc();
         let sf = Sonyflake::new().unwrap();
         let id = sf.next_id().unwrap();
@@ -157,8 +160,9 @@ impl Message {
 
         let change_log = ChangeLog::new("payload".to_string(), reason, None, None);
         let audit = AuditLog::new(
-            workflow.to_string(), 
-            task.to_string(), 
+            workflow_id.to_string(), 
+            workflow_version,
+            task_id.to_string(), 
             start_time,
             description.to_string(),
             vec![change_log]
@@ -175,13 +179,14 @@ impl Message {
             metadata: Value::Null,
             progress: Progress {
                 status: MessageStatus::Recieved,
-                workflow_id: workflow.to_string(),
-                prev_task: task.to_string(),
+                workflow_id: workflow_id.to_string(),
+                prev_task: task_id.to_string(),
                 prev_status_code: Some(StatusCode::Success),
                 timestamp: OffsetDateTime::now_utc(),
             },
             audit: vec![audit],
             transaction_changes: Some(Vec::new()),
+            ephemeral_data: Value::Null,
         }
     }
 }

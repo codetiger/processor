@@ -16,10 +16,10 @@ pub enum InitiationResponse {
     Error(Vec<String>),
 }
 
-async fn publish_to_kafka(message: &Message, config: &Config) -> Result<(), String> {
+async fn publish_to_kafka(message: &Message, config: &AppConfig) -> Result<(), String> {
     let producer: FutureProducer = ClientConfig::new()
-        .set("bootstrap.servers", &config.kafka.bootstrap_servers)
-        .set("message.timeout.ms", &config.kafka.message_timeout_ms)
+        .set("bootstrap.servers", &config.kafkabootstrapservers)
+        .set("message.timeout.ms", &config.kafkamessagetimeoutms)
         .create()
         .map_err(|e| format!("Producer creation error: {}", e))?;
 
@@ -28,7 +28,7 @@ async fn publish_to_kafka(message: &Message, config: &Config) -> Result<(), Stri
 
     producer
         .send(
-            FutureRecord::to(&config.kafka.topic)
+            FutureRecord::to(&config.kafkatopic)
                 .payload(json_string.as_bytes())
                 .key(&message.id().to_string()),
             std::time::Duration::from_secs(5),
@@ -40,7 +40,7 @@ async fn publish_to_kafka(message: &Message, config: &Config) -> Result<(), Stri
 }
 
 pub async fn initiate_message(
-    config: web::Data<Config>,
+    config: web::Data<AppConfig>,
     _req: HttpRequest,
     body: String,
 ) -> impl Responder {
@@ -56,6 +56,7 @@ pub async fn initiate_message(
             "tenant1".to_string(),
             "api".to_string(),
             "processor".to_string(),
+            1,
             "initiate".to_string(),
             Some("Payment".to_string()),
         );

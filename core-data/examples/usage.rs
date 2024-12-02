@@ -19,25 +19,26 @@ fn main() {
         "banking".to_string(),
         "pacs.008.001.07".to_string(),
         "UsageExample".to_string(),
+        1,
         "ISOOutgoing".to_string(),
         Some("Payment".to_string()),
     );
 
     // Time the parse operation
     let parse_start = Instant::now();
-    message.parse(Some("Parsed pacs.008 message".to_string()), "UsageExample".to_string(), "ISOOutgoing".to_string())
+    message.parse(Some("Parsed pacs.008 message".to_string()), "UsageExample".to_string(), 1, "ISOOutgoing".to_string())
         .expect("Failed to parse XML message");
     let parse_duration = parse_start.elapsed();
 
     let enrichment_config = vec![
-        EnrichmentConfig {
+        EnrichmentRules {
             field: "data.metadata.processing_date".to_string(),
-            rule: json!({"var": ["processing_date"]}),
+            logic: json!({"var": ["processing_date"]}),
             description: Some("Add processing date".to_string()),
         },
-        EnrichmentConfig {
+        EnrichmentRules {
             field: "data.metadata.transaction_type".to_string(),
-            rule: json!({"var": ["transaction_type"]}),
+            logic: json!({"var": ["transaction_type"]}),
             description: Some("Add transaction type".to_string()),
         },
     ];
@@ -49,7 +50,7 @@ fn main() {
 
     // Time the enrich operation
     let enrich_start = Instant::now();
-    message.enrich(enrichment_config, enrichment_data, Some("Enriched pacs.008 message".to_string()), "UsageExample".to_string(), "ISOOutgoing".to_string())
+    message.enrich(enrichment_config, enrichment_data, Some("Enriched pacs.008 message".to_string()), "UsageExample".to_string(), 1, "ISOOutgoing".to_string())
         .expect("Failed to enrich message");
     let enrich_duration = enrich_start.elapsed();
 

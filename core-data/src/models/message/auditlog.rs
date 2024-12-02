@@ -15,6 +15,8 @@ pub struct AuditLog {
 
     workflow: Box<str>,
 
+    workflow_version: u16,
+
     task: Box<str>,
 
     description: Box<str>,
@@ -24,8 +26,6 @@ pub struct AuditLog {
     service: Box<str>,
 
     instance: Box<str>,
-
-    version: Box<str>,
 
     changes: Box<[ChangeLog]>,
 }
@@ -59,8 +59,8 @@ impl AuditLog {
         &self.instance
     }
 
-    pub fn version(&self) -> &str {
-        &self.version
+    pub fn workflow_version(&self) -> u16 {
+        self.workflow_version
     }
 
     pub fn changes(&self) -> &[ChangeLog] {
@@ -75,7 +75,7 @@ impl AuditLog {
         &self.finish_time
     }
 
-    pub fn new(workflow: String, task: String, start_time: OffsetDateTime, description: String, changes: Vec<ChangeLog>) -> Self {
+    pub fn new(workflow: String, workflow_version: u16, task: String, start_time: OffsetDateTime, description: String, changes: Vec<ChangeLog>) -> Self {
         let sf = Sonyflake::new().unwrap();
         let id = sf.next_id().unwrap();
         let timestamp = OffsetDateTime::now_utc();
@@ -84,12 +84,12 @@ impl AuditLog {
             start_time,
             finish_time: timestamp,
             workflow: workflow.into_boxed_str(),
+            workflow_version,
             task: task.into_boxed_str(),
             description: description.into_boxed_str(),
             hash: String::new().into_boxed_str(),
             service: String::new().into_boxed_str(),
             instance: String::new().into_boxed_str(),
-            version: String::new().into_boxed_str(),
             changes: changes.into_boxed_slice(),
         }
     }

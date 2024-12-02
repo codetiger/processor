@@ -10,25 +10,25 @@ use super::{
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct EnrichmentConfig {
+pub struct EnrichmentRules {
     pub field: String,
 
-    pub rule: Value,
+    pub logic: Value,
 
     pub description: Option<String>,
 }
 
 impl Message {
-    pub fn enrich(&mut self, config: Vec<EnrichmentConfig>, data: serde_json::Value, description: Option<String>, workflow: String, task: String) -> Result<(), FunctionResponseError> {
+    pub fn enrich(&mut self, rules: Vec<EnrichmentRules>, data: serde_json::Value, description: Option<String>, workflow_id: String, workflow_version: u16, task_id: String) -> Result<(), FunctionResponseError> {
         let start_time = OffsetDateTime::now_utc();
         let logic = JsonLogic::new();
         let mut changes = Vec::new();
         
         // Begin transaction
-        self.transaction_begin(workflow.clone(), task.clone());
+        self.transaction_begin(workflow_id.clone(), task_id.clone());
 
-        for cfg in config {
-            let value = match logic.apply(&cfg.rule, &data) {
+        for rule in rules {
+            let value = match logic.apply(&rule.logic, &data) {
                 Ok(v) => v,
                 Err(e) => {
                     // Rollback on error
@@ -42,15 +42,15 @@ impl Message {
             };
 
             // Update with transaction support
-            if let Err(e) = self.update(&cfg.field, value.clone()) {
+            if let Err(e) = self.update(&rule.field, value.clone()) {
                 self.transaction_rollback();
                 return Err(e);
             }
 
             // Record change for audit
             changes.push(ChangeLog::new(
-                cfg.field.to_string(),
-                cfg.description.unwrap_or_else(|| format!("Enriched field {}", cfg.field)),
+                rule.field.to_string(),
+                rule.description.unwrap_or_else(|| format!("Enriched field {}", rule.field)),
                 None,
                 Some(value)
             ));
@@ -61,8 +61,9 @@ impl Message {
 
         // Create audit log
         let audit_log = AuditLog::new(
-            workflow.to_string(),
-            task.to_string(),
+            workflow_id.to_string(),
+            workflow_version,
+            task_id.to_string(),
             start_time,
             description.unwrap_or_else(|| "Enrichment applied".to_string()),
             changes

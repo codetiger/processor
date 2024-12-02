@@ -1,10 +1,11 @@
-kafka_config:
+kafka:
   bootstrap_servers: "localhost:9092"
   group_id: "batch_processor"
-  input_topic: 
-    - "message_input"
-  output_topic: 
-    - "message_output"
-batch_config:
+batch:
   batch_size: 1
   batch_timeout_ms: 1000
+mongodb:
+  uri: "mongodb://localhost:27017"
+  database: "PaymentProcessor"
+workflow_ids:
+  - "payment_processing"

@@ -11,12 +11,12 @@ async fn main() -> std::io::Result<()> {
     let config = match load_config() {
         Ok(cfg) => cfg,
         Err(e) => {
-            eprintln!("Failed to load config: {}", e);
+            eprintln!("Failed to load config: {:?}", e);
             std::process::exit(1);
         }
     };
 
-    println!("Starting server at http://{}:{}", &config.server.hostname, &config.server.port);
+    println!("Starting server at http://{}:{}", &config.serverhostname, &config.serverport);
     let web_config = web::Data::new(config.clone());
     
     HttpServer::new(move || {
@@ -30,7 +30,7 @@ async fn main() -> std::io::Result<()> {
                 .add(("Access-Control-Allow-Methods", "POST"))
                 .add(("Access-Control-Allow-Headers", "Content-Type")))
     })
-    .bind(format!("{}:{}", &config.server.hostname, &config.server.port))?
+    .bind(format!("{}:{}", &config.serverhostname, &config.serverport))?
     .run()
     .await
 }

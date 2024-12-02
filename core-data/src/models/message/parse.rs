@@ -12,7 +12,7 @@ use super::{
 
 
 impl Message {
-    pub fn parse(&mut self, description: Option<String>, workflow: String, task: String) -> Result<(), FunctionResponseError> {
+    pub fn parse(&mut self, description: Option<String>, workflow_id: String, workflow_version: u16, task_id: String) -> Result<(), FunctionResponseError> {
         const BUFFER_SIZE: usize = 32 * 1024; // 32KB buffer
         let start_time = OffsetDateTime::now_utc();
         let buf_reader: Box<dyn BufRead> = if let Some(content) = self.payload.content() {
@@ -49,8 +49,9 @@ impl Message {
                             None
                         );
                         let audit_log = AuditLog::new(
-                            workflow.to_string(),
-                            task.to_string(),
+                            workflow_id.to_string(),
+                            workflow_version,
+                            task_id.to_string(),
                             start_time,
                             description.unwrap_or_else(|| "ISO20022 message parsed".to_string()),
                             vec![change_log]

@@ -1,51 +1,51 @@
-use serde::{Deserialize, Serialize};
+use std::env;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
-    #[error("Invalid configuration: {0}")]
-    ValidationError(String),
+    #[error("Environment variable error: {0}")]
+    EnvVarError(#[from] std::env::VarError),
+    #[error("Parse error: {0}")]
+    ParseError(String),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Config {
-    pub kafka_config: KafkaConfig,
-    pub batch_config: BatchConfig,
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct AppConfig {
+    pub kafkabootstrapservers: String,
+    pub kafkagroupid: String,
+
+    pub batchsize: usize,
+    pub batchtimeoutms: u64,
+
+    pub mongodburi: String,
+    pub mongodbdatabase: String,
+
+    pub workflowids: Vec<String>,
 }
 
-impl Config {
-    pub fn validate(&self) -> Result<(), ConfigError> {
-        if self.kafka_config.input_topic.is_empty() || self.kafka_config.output_topic.is_empty() {
-            return Err(ConfigError::ValidationError(
-                "Input and output topics cannot be empty".to_string(),
-            ));
-        }
-        if self.batch_config.batch_size == 0 {
-            return Err(ConfigError::ValidationError(
-                "Batch size must be greater than 0".to_string(),
-            ));
-        }
-        Ok(())
-    }
-}
+pub fn load_config() -> Result<AppConfig, ConfigError> {
+    let mut config = AppConfig::default();
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KafkaConfig {
-    pub bootstrap_servers: String,
-    pub group_id: String,
-    pub input_topic: Vec<String>,
-    pub output_topic: Vec<String>,
-}
+    config.kafkabootstrapservers = env::var("KAFKABOOTSTRAPSERVERS")?;
+    config.kafkagroupid = env::var("KAFKAGROUPID")?;
+    
+    config.batchsize = env::var("BATCHSIZE")
+        .unwrap_or_else(|_| String::from("1"))
+        .parse()
+        .map_err(|e| ConfigError::ParseError(format!("Invalid batch size: {}", e)))?;
+    
+    config.batchtimeoutms = env::var("BATCHTIMEOUTMS")
+        .unwrap_or_else(|_| String::from("1000"))
+        .parse()
+        .map_err(|e| ConfigError::ParseError(format!("Invalid timeout: {}", e)))?;
+    
+    config.mongodburi = env::var("MONGODBURI")?;
+    config.mongodbdatabase = env::var("MONGODBDATABASE")?;
+    
+    config.workflowids = env::var("WORKFLOWIDS")?
+        .split(',')
+        .map(String::from)
+        .collect();
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BatchConfig {
-    pub batch_size: usize,
-    pub batch_timeout_ms: u64,
-}
-
-pub fn load_config() -> Result<Config, config::ConfigError> {
-    config::Config::builder()
-        .add_source(config::File::with_name("config"))
-        .build()?
-        .try_deserialize()
+    Ok(config)
 }

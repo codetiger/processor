@@ -1,0 +1,127 @@
+{
+  "id": "payment_processing",
+  "name": "Payment Processing Workflow",
+  "description": "Process incoming ISO20022 payment messages",
+  "version": 1,
+  "tenant": "banking",
+  "origin": "pacs.008.001.07",
+  "status": "Active",
+  "condition": {},
+  "input_topic": "payment_incoming",
+  "tasks": [
+    {
+      "id": "parse_iso20022",
+      "name": "Parse ISO20022 Message",
+      "description": "Parse incoming XML payment message",
+      "message_status": "Recieved",
+      "prev_task": "",
+      "prev_status_code": null,
+      "condition": null,
+      "function": "Parse",
+      "input": {}
+    },
+    {
+      "id": "fetch_customer_data",
+      "name": "Fetch Customer Data",
+      "description": "Retrieve customer information",
+      "message_status": "Processing",
+      "prev_task": "parse_iso20022",
+      "prev_status_code": "Success",
+      "condition": null,
+      "function": "Fetch",
+      "input": {
+        "customers": {
+          "CUST001": {
+            "name": "John Smith",
+            "country": "GB",
+            "risk_rating": "LOW",
+            "status": "ACTIVE"
+          },
+          "CUST002": {
+            "name": "Maria Garcia",
+            "country": "ES",
+            "risk_rating": "MEDIUM",
+            "status": "ACTIVE"
+          }
+        }
+      }
+    },
+    {
+      "id": "enrich_risk_data",
+      "name": "Add Risk Information",
+      "description": "Enrich message with customer risk data",
+      "message_status": "Processing",
+      "prev_task": "fetch_customer_data",
+      "prev_status_code": "Success",
+      "condition": null,
+      "function": "Enrich",
+      "input": [
+        {
+          "field": "data.metadata.customer_risk_score",
+          "logic": {"var": ["customer_data.risk_score"]},
+          "description": "Add customer risk score"
+        },
+        {
+          "field": "data.metadata.customer_category",
+          "logic": {"var": ["customer_data.category"]},
+          "description": "Add customer category"
+        }
+      ]
+    },
+    {
+      "id": "fetch_fx_rates",
+      "name": "Fetch Exchange Rates",
+      "description": "Get current exchange rates for currency conversion",
+      "message_status": "Processing",
+      "prev_task": "enrich_risk_data",
+      "prev_status_code": "Success",
+      "condition": {
+        "!=": [
+          {"var": "data.document.FIToFICstmrCdtTrf.CdtTrfTxInf.IntrBkSttlmAmt.Ccy"},
+          "EUR"
+        ]
+      },
+      "function": "Fetch",
+      "input": {
+        "fx_rates": {
+          "USD": {"EUR": 0.92},
+          "GBP": {"EUR": 1.17},
+          "CHF": {"EUR": 0.96},
+          "JPY": {"EUR": 0.0064}
+        }
+      }
+    },
+    {
+      "id": "enrich_processing_data",
+      "name": "Add Processing Information",
+      "description": "Enrich with final processing details",
+      "message_status": "Processing",
+      "prev_task": "fetch_fx_rates",
+      "prev_status_code": "Success",
+      "condition": null,
+      "function": "Enrich",
+      "input": [
+        {
+          "field": "data.metadata.processing_date",
+          "logic": {"var": ["current_date"]},
+          "description": "Add processing timestamp"
+        },
+        {
+          "field": "data.metadata.exchange_rate",
+          "logic": {"var": ["fx_data.rate"]},
+          "description": "Add applied exchange rate"
+        },
+        {
+          "field": "data.metadata.settlement_amount_eur",
+          "logic": {
+            "*": [
+              {"var": "data.document.FIToFICstmrCdtTrf.CdtTrfTxInf.IntrBkSttlmAmt.Amt"},
+              {"var": "fx_data.rate"}
+            ]
+          },
+          "description": "Calculate settlement amount in EUR"
+        }
+      ]
+    }
+  ]
+}

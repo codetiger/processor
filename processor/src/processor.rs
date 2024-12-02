@@ -10,6 +10,7 @@ use futures::StreamExt;
 use tracing::{debug, error, info};
 
 use crate::config::config::*;
+use core_data::models::workflow::Workflow;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProcessorError {
@@ -24,42 +25,46 @@ pub enum ProcessorError {
 pub struct BatchProcessor {
     consumer: StreamConsumer,
     producer: FutureProducer,
-    config: Arc<Config>,
+    config: Arc<AppConfig>,
+    workflows: Vec<Workflow>,
 }
 
 type ProcessResult<T> = Result<T, ProcessorError>;
 
 impl BatchProcessor {
-    pub fn new(config: Config) -> ProcessResult<Self> {
-        config.validate()?;
-        
+    pub fn new(config: AppConfig, workflows: Vec<Workflow>) -> ProcessResult<Self> {
         let consumer: StreamConsumer = Self::create_consumer(&config)?;
         let producer: FutureProducer = Self::create_producer(&config)?;
 
+        let input_topics: Vec<&str> = workflows.iter()
+            .map(|w| w.input_topic.as_str())
+            .collect();
+        
         consumer
-            .subscribe(&[&config.kafka_config.input_topic[0]])
+            .subscribe(&input_topics)
             .map_err(ProcessorError::KafkaError)?;
 
         Ok(Self {
             consumer,
             producer,
             config: Arc::new(config),
+            workflows,
         })
     }
 
-    fn create_consumer(config: &Config) -> ProcessResult<StreamConsumer> {
+    fn create_consumer(config: &AppConfig) -> ProcessResult<StreamConsumer> {
         ClientConfig::new()
-            .set("group.id", &config.kafka_config.group_id)
-            .set("bootstrap.servers", &config.kafka_config.bootstrap_servers)
+            .set("group.id", &config.kafkagroupid)
+            .set("bootstrap.servers", &config.kafkabootstrapservers)
             .set("enable.auto.commit", "false")
             .set("auto.offset.reset", "earliest")
             .create()
             .map_err(ProcessorError::KafkaError)
     }
 
-    fn create_producer(config: &Config) -> ProcessResult<FutureProducer> {
+    fn create_producer(config: &AppConfig) -> ProcessResult<FutureProducer> {
         ClientConfig::new()
-            .set("bootstrap.servers", &config.kafka_config.bootstrap_servers)
+            .set("bootstrap.servers", &config.kafkabootstrapservers)
             .set("message.timeout.ms", "5000")
             .create()
             .map_err(ProcessorError::KafkaError)
@@ -68,7 +73,7 @@ impl BatchProcessor {
     pub async fn run(&self) -> ProcessResult<()> {
         info!("Starting batch processor");
         let mut message_stream = self.consumer.stream();
-        let mut batch = BatchBuffer::new(self.config.batch_config.batch_size);
+        let mut batch = BatchBuffer::new(self.config.batchsize);
         let mut last_message_time = tokio::time::Instant::now();
 
         loop {
@@ -89,8 +94,8 @@ impl BatchProcessor {
                         }
                     }
                 }
-                _ = sleep(Duration::from_millis(self.config.batch_config.batch_timeout_ms)) => {
-                    if batch.should_process(last_message_time, self.config.batch_config.batch_timeout_ms) {
+                _ = sleep(Duration::from_millis(self.config.batchtimeoutms)) => {
+                    if batch.should_process(last_message_time, self.config.batchtimeoutms) {
                         self.process_batch(&mut batch).await?;
                     }
                 }
@@ -170,16 +175,16 @@ impl BatchProcessor {
         processed_message: Vec<u8>,
         headers: rdkafka::message::OwnedHeaders,
     ) -> ProcessResult<()> {
-        self.producer
-            .send(
-                FutureRecord::to(&self.config.kafka_config.output_topic[0])
-                    .payload(&processed_message)
-                    .key(original_message.key().unwrap_or_default())
-                    .headers(headers),
-                Duration::from_secs(5),
-            )
-            .await
-            .map_err(|(e, _)| ProcessorError::KafkaError(e))?;
+        // self.producer
+        //     .send(
+        //         FutureRecord::to(&self.config.kafka.output_topic[0])
+        //             .payload(&processed_message)
+        //             .key(original_message.key().unwrap_or_default())
+        //             .headers(headers),
+        //         Duration::from_secs(5),
+        //     )
+        //     .await
+        //     .map_err(|(e, _)| ProcessorError::KafkaError(e))?;
         Ok(())
     }
 
