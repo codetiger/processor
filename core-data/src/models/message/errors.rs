@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug)]
 pub struct FunctionResponseError {
     pub function: String,
@@ -21,5 +23,15 @@ pub struct WorkflowResponseError {
 impl WorkflowResponseError {
     pub fn new(workflow_id: String, version: u16, code: u16, desciption: String) -> Self {
         WorkflowResponseError { workflow_id, version, code, desciption }
+    }
+}
+
+impl fmt::Display for WorkflowResponseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Workflow error - ID: {}, Version: {}, Code: {}, Message: {}",
+            self.workflow_id, self.version, self.code, self.desciption
+        )
     }
 }

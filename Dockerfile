@@ -39,16 +39,17 @@ COPY --from=chef /usr/local/cargo /usr/local/cargo
 # Copy the source code
 COPY . .
 # Build the application
-RUN cargo build --release --workspace
+RUN cargo build --workspace
+# RUN cargo build --release --workspace
 
 # Processor production image
 FROM debian:bullseye-slim AS processor
 WORKDIR /usr/local/bin
-COPY --from=builder /buildspace/target/release/open-payments-processor .
+COPY --from=builder /buildspace/target/debug/open-payments-processor .
 CMD ["./open-payments-processor"]
 
 # API production image  
 FROM debian:bullseye-slim AS processor-api
 WORKDIR /usr/local/bin
-COPY --from=builder /buildspace/target/release/open-payments-processor-api .
+COPY --from=builder /buildspace/target/debug/open-payments-processor-api .
 CMD ["./open-payments-processor-api"]

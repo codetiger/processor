@@ -36,6 +36,7 @@ impl Message {
             for task in &workflow.tasks {
                 if self.task_match(task.message_status.clone(), &workflow.id, &task.prev_task, task.prev_status_code.clone(), &task.condition) {
                     self.execute_task(workflow.id.clone(), workflow.version, task.clone()).unwrap();
+                    println!("Task executed: {:?}", serde_json::to_string_pretty(self));
                     task_executed = true;
                 }
             }

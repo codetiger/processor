@@ -26,6 +26,7 @@ async fn publish_to_kafka(message: &Message, config: &AppConfig) -> Result<(), S
         let json_string = serde_json::to_string(&message)
         .map_err(|e| format!("Message serialization error: {}", e))?;
 
+        println!("Publishing message: {}", json_string);
     producer
         .send(
             FutureRecord::to(&config.kafkatopic)
@@ -55,7 +56,7 @@ pub async fn initiate_message(
             payload,
             "tenant1".to_string(),
             "api".to_string(),
-            "processor".to_string(),
+            "payment_processing".to_string(),
             1,
             "initiate".to_string(),
             Some("Payment".to_string()),

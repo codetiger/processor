@@ -118,7 +118,7 @@ impl BatchProcessor {
             .messages()
             .map(|(_, message)| async {
                 let payload = message.payload().unwrap_or_default();
-                process_message(payload).await
+                process_message(payload, &self.workflows).await
             })
             .collect();
 
@@ -235,7 +235,7 @@ impl<'a> BatchBuffer<'a> {
 }
 
 
-async fn process_message(msg: &[u8]) -> Result<Vec<u8>, ProcessorError> {
+async fn process_message(msg: &[u8], workflows: &[Workflow]) -> Result<Vec<u8>, ProcessorError> {
     // Validate message
     if msg.is_empty() {
         return Err(ProcessorError::ProcessingError(
@@ -243,10 +243,21 @@ async fn process_message(msg: &[u8]) -> Result<Vec<u8>, ProcessorError> {
         ));
     }
 
-    let message: core_data::models::message::Message = serde_json::from_slice(msg)
+    let mut message: core_data::models::message::Message = serde_json::from_slice(msg)
         .map_err(|e| ProcessorError::ProcessingError(format!("Error deserializing message: {}", e)))?;
     
-    let json_string = serde_json::to_string(&message).unwrap();
+    // Find and execute matching workflow
+    for workflow in workflows {
+        if message.workflow_match(&workflow.tenant, &workflow.origin, &workflow.condition) {
+            message.execute_workflow(workflow)
+                .map_err(|e| ProcessorError::ProcessingError(format!("Workflow execution error: {}", e)))?;
+            break; // Execute only the first matching workflow
+        }
+    }
+    
+    // Safely serialize the modified message
+    let json_string = serde_json::to_string(&message)
+        .map_err(|e| ProcessorError::ProcessingError(format!("Error serializing message: {}", e)))?;
 
     Ok(json_string.as_bytes().to_vec())
 }
