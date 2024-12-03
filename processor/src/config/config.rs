@@ -14,8 +14,7 @@ pub struct AppConfig {
     pub kafkabootstrapservers: String,
     pub kafkagroupid: String,
 
-    pub batchsize: usize,
-    pub batchtimeoutms: u64,
+    pub maxConcurrency: usize,
 
     pub mongodburi: String,
     pub mongodbdatabase: String,
@@ -29,15 +28,10 @@ pub fn load_config() -> Result<AppConfig, ConfigError> {
     config.kafkabootstrapservers = env::var("KAFKABOOTSTRAPSERVERS")?;
     config.kafkagroupid = env::var("KAFKAGROUPID")?;
     
-    config.batchsize = env::var("BATCHSIZE")
+    config.maxConcurrency = env::var("MAXCONCURRENCY")
         .unwrap_or_else(|_| String::from("1"))
         .parse()
         .map_err(|e| ConfigError::ParseError(format!("Invalid batch size: {}", e)))?;
-    
-    config.batchtimeoutms = env::var("BATCHTIMEOUTMS")
-        .unwrap_or_else(|_| String::from("1000"))
-        .parse()
-        .map_err(|e| ConfigError::ParseError(format!("Invalid timeout: {}", e)))?;
     
     config.mongodburi = env::var("MONGODBURI")?;
     config.mongodbdatabase = env::var("MONGODBDATABASE")?;

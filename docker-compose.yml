@@ -72,6 +72,20 @@ services:
       echo "Verifying topics:"
       kafka-topics.sh --bootstrap-server kafka:9092 --list
       '
+
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - 8080:8080
+    depends_on:
+      - kafka
+    networks:
+      - payment-network
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+
   processor:
     build:
       context: .
@@ -88,8 +102,6 @@ services:
       RUST_LOG: "trace,actix_web=info,processor=trace"
       KAFKABOOTSTRAPSERVERS: kafka:9092
       KAFKAGROUPID: batch_processor
-      BATCHSIZE: 1
-      BATCHTIMEOUTMS: 1000
       MONGODBURI: mongodb://mongodb:27017
       MONGODBDATABASE: PaymentProcessor
       WORKFLOWIDS: payment_processing
@@ -100,7 +112,7 @@ services:
       dockerfile: Dockerfile
       target: processor-api
     ports:
-      - "8080:8080"
+      - "8090:8090"
     depends_on:
       kafka:
         condition: service_healthy
@@ -111,7 +123,7 @@ services:
     environment:
       RUST_LOG: "trace,actix_web=info,processor_api=trace"
       SERVERHOSTNAME: 0.0.0.0
-      SERVERPORT: 8080
+      SERVERPORT: 8090
       KAFKABOOTSTRAPSERVERS: kafka:9092
       KAFKAMESSAGETIMEOUTMS: 5000
       KAFKATOPIC: payment_incoming

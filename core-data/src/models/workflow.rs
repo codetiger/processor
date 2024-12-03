@@ -23,6 +23,8 @@ pub struct Workflow {
     pub tasks: Vec<Task>,
 
     pub input_topic: String,
+
+    pub persist_on_complete: bool,
 }
 
 

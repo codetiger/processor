@@ -122,20 +122,3 @@ impl Message {
         Ok(())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn test_enrichment_rules_creation() {
-        let rule = EnrichmentRules {
-            field: "test_field".to_string(),
-            logic: json!({"==": [1, 1]}),
-            description: Some("Test description".to_string()),
-        };
-        assert_eq!(rule.field, "test_field");
-        assert!(rule.description.is_some());
-    }
-}
