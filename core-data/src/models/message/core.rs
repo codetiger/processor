@@ -127,16 +127,24 @@ impl Message {
 
     pub(crate) fn update(&mut self, field_path: &str, new_value: Value) -> Result<(), FunctionResponseError> {
         let parts: Vec<&str> = field_path.split('.').collect();
-        
-        if parts[0] != "data" {
+    
+        // Check if path starts with valid root field
+        if parts[0] != "data" && parts[0] != "metadata" {
             return Err(FunctionResponseError::new(
                 "Update".to_string(),
                 400,
-                "Invalid field path".to_string()
+                "Field path must start with 'data' or 'metadata'".to_string()
             ));
         }
-
-        let mut current = &mut self.data;
+    
+        // Select the appropriate root object
+        let root = match parts[0] {
+            "data" => &mut self.data,
+            "metadata" => &mut self.metadata,
+            _ => unreachable!()
+        };
+    
+        let mut current = root;
         for (i, part) in parts.iter().enumerate().skip(1) {
             if i == parts.len() - 1 {
                 // Store old value for potential rollback

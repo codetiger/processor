@@ -104,7 +104,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     
-    let processor = BatchProcessor::new(config, workflows)?;
+    let processor = Processor::new(config, workflows)?;
     processor.run().await?;
 
     Ok(())

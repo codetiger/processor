@@ -6,6 +6,7 @@ mod parse;
 mod enrich;
 mod execute;
 mod logic;
+mod fetch;
 
 mod errors;
 mod iso20022;

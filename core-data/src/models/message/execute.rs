@@ -5,7 +5,7 @@ use tracing::{debug, error, info, instrument, warn};
 use super::errors::WorkflowResponseError;
 use super::{
     core::Message,
-    errors::FunctionResponseError,
+    errors::FunctionResponseError, EnrichmentRules
 };
 
 use super::progress::*;
@@ -29,7 +29,21 @@ impl Message {
                         status_code: Some(StatusCode::Success)
                     })
             },
-            // Add other function types...
+            FunctionType::Enrich => {
+                let rules: Vec<EnrichmentRules> = serde_json::from_value(task.input).unwrap();
+                self.enrich(rules, self.ephemeral_data.clone(), Some(task.description), workflow_id, workflow_version, task.id)
+                    .map(|_| TaskResult {
+                        status: MessageStatus::Processing,
+                        status_code: Some(StatusCode::Success)
+                    })
+            },
+            FunctionType::Fetch => {
+                self.fetch(task.input, Some(task.description), workflow_id, workflow_version, task.id)
+                    .map(|_| TaskResult {
+                        status: MessageStatus::Processing,
+                        status_code: Some(StatusCode::Success)
+                    })
+            },
             _ => Err(FunctionResponseError::new(
                 "Execute".to_string(),
                 400,
