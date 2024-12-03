@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use time::OffsetDateTime;
 use sonyflake::Sonyflake;
+use tracing::{debug, error, info, instrument};
 
 use crate::models::message::payload::*;
 use crate::models::message::auditlog::*;
@@ -80,13 +81,21 @@ impl Message {
         self.version
     }
 
+    #[instrument(skip(self))]
     pub(crate) fn transaction_begin(&mut self, workflow: String, task: String) {
+        debug!(
+            workflow = %workflow,
+            task = %task,
+            "Beginning transaction"
+        );
         self.progress.workflow_id = workflow;
         self.progress.prev_task = task;
         self.transaction_changes = Some(Vec::new());
     }
 
+    #[instrument(skip(self))]
     pub(crate) fn transaction_rollback(&mut self) {
+        error!("Rolling back transaction");
         if let Some(changes) = self.transaction_changes.take() {
             for (field_path, old_value) in changes.iter().rev() {
                 let parts: Vec<&str> = field_path.split('.').collect();
@@ -145,10 +154,18 @@ impl Message {
         Ok(())
     }
 
+    #[instrument(skip(payload, tenant, origin, workflow_id, task_id), fields(message_id))]
     pub fn new(payload: Payload, tenant: String, origin: String, workflow_id: String, workflow_version: u16, task_id: String, message_alias: Option<String>) -> Self {
-        let start_time = OffsetDateTime::now_utc();
+        let start = std::time::Instant::now();
         let sf = Sonyflake::new().unwrap();
         let id = sf.next_id().unwrap();
+
+        debug!(
+            tenant = %tenant,
+            origin = %origin,
+            workflow_id = %workflow_id,
+            "Creating new message"
+        );
 
         let alias = message_alias.unwrap_or_else(|| "Message".to_string());
         let description = alias
@@ -163,9 +180,15 @@ impl Message {
             workflow_id.to_string(), 
             workflow_version,
             task_id.to_string(), 
-            start_time,
+            OffsetDateTime::now_utc(),
             description.to_string(),
             vec![change_log]
+        );
+
+        info!(
+            message_id = %id,
+            duration_ms = start.elapsed().as_millis(),
+            "Message created successfully"
         );
 
         Self {

@@ -6,7 +6,7 @@
   "tenant": "banking",
   "origin": "pacs.008.001.07",
   "status": "Active",
-  "condition": {},
+  "condition": null,
   "input_topic": "payment_incoming",
   "tasks": [
     {

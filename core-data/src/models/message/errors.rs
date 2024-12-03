@@ -13,6 +13,24 @@ impl FunctionResponseError {
     }
 }
 
+impl From<FunctionResponseError> for WorkflowResponseError {
+    fn from(err: FunctionResponseError) -> Self {
+        WorkflowResponseError {
+            workflow_id: "unknown".to_string(), // This will be updated in execute_workflow
+            version: 0,                         // This will be updated in execute_workflow
+            code: 500,
+            desciption: format!("Function error: {} ({})", err.message, err.function),
+        }
+    }
+}
+
+impl fmt::Display for FunctionResponseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Function '{}' failed (code {}): {}", 
+            self.function, self.code, self.message)
+    }
+}
+
 pub struct WorkflowResponseError {
     pub workflow_id: String,
     pub version: u16,
