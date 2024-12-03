@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document
+	xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.02"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<FIToFICstmrCdtTrf>
+		<GrpHdr>
+			<MsgId>VOLCUSTMSGID0001</MsgId>
+			<CreDtTm>2019-09-23T09:15:45</CreDtTm>
+			<NbOfTxs>1</NbOfTxs>
+			<TtlIntrBkSttlmAmt Ccy="EUR">100.00</TtlIntrBkSttlmAmt>
+			<IntrBkSttlmDt>2020-06-20</IntrBkSttlmDt>
+			<SttlmInf>
+				<SttlmMtd>CLRG</SttlmMtd>
+				<ClrSys>
+					<Cd>TTD</Cd>
+				</ClrSys>
+			</SttlmInf>
+			<PmtTpInf>
+				<SvcLvl>
+					<Cd>SEPA</Cd>
+				</SvcLvl>
+				<LclInstrm>
+					<Cd>INST</Cd>
+				</LclInstrm>
+				<CtgyPurp>
+					<Cd>INST</Cd>
+				</CtgyPurp>
+			</PmtTpInf>
+			<InstgAgt>
+				<FinInstnId>
+					<BIC>IRCEIE2DXXX</BIC>
+				</FinInstnId>
+			</InstgAgt>
+			<InstdAgt>
+				<FinInstnId>
+					<BIC>AIBKIE2DXXX</BIC>
+				</FinInstnId>
+			</InstdAgt>
+		</GrpHdr>
+		<CdtTrfTxInf>
+			<PmtId>
+				<InstrId>VOLCUSTINSTRID0001</InstrId>
+				<EndToEndId>VOLCUSTETEID0001</EndToEndId>
+				<TxId>VOLCUSTTXID00001</TxId>
+				<ClrSysRef>003</ClrSysRef>
+			</PmtId>
+			<PmtTpInf>
+				<SvcLvl>
+					<Cd>SDVA</Cd>
+				</SvcLvl>
+				<LclInstrm>
+					<Cd>ACCEPT</Cd>
+				</LclInstrm>
+			</PmtTpInf>
+			<IntrBkSttlmAmt Ccy="EUR">100.00</IntrBkSttlmAmt>
+			<AccptncDtTm>2024-11-14T09:47:39.835Z</AccptncDtTm>
+			<ChrgBr>SLEV</ChrgBr>
+			<InitgPty>
+				<Nm>InitgPty</Nm>
+			</InitgPty>
+			<Dbtr>
+				<Nm>Mr. Jones</Nm>
+				<PstlAdr>
+					<StrtNm>16th Street</StrtNm>
+					<BldgNb>30</BldgNb>
+					<PstCd>NY10023</PstCd>
+					<TwnNm>New York</TwnNm>
+					<Ctry>US</Ctry>
+				</PstlAdr>
+			</Dbtr>
+			<DbtrAcct>
+				<Id>
+					<IBAN>IE64IRCE92050112345678</IBAN>
+				</Id>
+			</DbtrAcct>
+			<DbtrAgt>
+				<FinInstnId>
+					<BIC>IRCEIE2DXXX</BIC>
+				</FinInstnId>
+			</DbtrAgt>
+			<CdtrAgt>
+				<FinInstnId>
+					<BIC>AIBKIE2DXXX</BIC>
+				</FinInstnId>
+			</CdtrAgt>
+			<Cdtr>
+				<Nm>ZZ Insurances</Nm>
+				<PstlAdr>
+					<StrtNm>Friedrich-Ebert-Anlage</StrtNm>
+					<BldgNb>2-14</BldgNb>
+					<PstCd>D-60 325</PstCd>
+					<TwnNm>Frankfurt am Main</TwnNm>
+					<Ctry>DE</Ctry>
+					<AdrLine>City Haus 1 10th Floor</AdrLine>
+				</PstlAdr>
+			</Cdtr>
+			<CdtrAcct>
+				<Id>
+					<IBAN>IE29AIBK93115212345678</IBAN>
+				</Id>
+			</CdtrAcct>
+		</CdtTrfTxInf>
+	</FIToFICstmrCdtTrf>
+</Document>

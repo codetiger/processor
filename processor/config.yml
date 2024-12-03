@@ -1,0 +1,11 @@
+kafka:
+  bootstrap_servers: "localhost:9092"
+  group_id: "batch_processor"
+batch:
+  batch_size: 1
+  batch_timeout_ms: 1000
+mongodb:
+  uri: "mongodb://localhost:27017"
+  database: "PaymentProcessor"
+workflow_ids:
+  - "payment_processing"
