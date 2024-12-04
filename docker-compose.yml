@@ -99,12 +99,13 @@ services:
     networks:
       - payment-network
     environment:
-      RUST_LOG: "trace,actix_web=info,processor=trace"
+      RUST_LOG: "info,actix_web=warn,processor=info"
       KAFKABOOTSTRAPSERVERS: kafka:9092
       KAFKAGROUPID: batch_processor
       MONGODBURI: mongodb://mongodb:27017
       MONGODBDATABASE: PaymentProcessor
       WORKFLOWIDS: payment_processing
+      MAXCONCURRENCY: 2000
 
   processor-api:
     build:
@@ -120,13 +121,38 @@ services:
         condition: service_healthy
     networks:
       - payment-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     environment:
-      RUST_LOG: "trace,actix_web=info,processor_api=trace"
+      RUST_LOG: "trace,actix_web=warn,processor_api=trace"
       SERVERHOSTNAME: 0.0.0.0
       SERVERPORT: 8090
       KAFKABOOTSTRAPSERVERS: kafka:9092
       KAFKAMESSAGETIMEOUTMS: 5000
       KAFKATOPIC: payment_incoming
+
+  benchmark:
+    build:
+      context: .
+      dockerfile: Dockerfile.benchmark
+    depends_on:
+      kafka:
+        condition: service_healthy
+      processor-api:
+        condition: service_healthy
+    networks:
+      - payment-network
+    environment:
+      API_MAX_CONCURRENT: 75
+      API_ITERATIONS: 10000
+      API_HOST: processor-api
+      API_PORT: 8090
+      KAFKA_HOST: kafka:9092
+      KAFKA_TOPIC: message_updates
 
 volumes:
   kafka_data:

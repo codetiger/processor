@@ -50,6 +50,7 @@ CMD ["./open-payments-processor"]
 
 # API production image  
 FROM debian:bullseye-slim AS processor-api
+RUN apt-get update && apt-get install -y curl
 WORKDIR /usr/local/bin
 COPY --from=builder /buildspace/target/debug/open-payments-processor-api .
 CMD ["./open-payments-processor-api"]

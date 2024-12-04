@@ -14,7 +14,7 @@ pub struct AppConfig {
     pub kafkabootstrapservers: String,
     pub kafkagroupid: String,
 
-    pub maxConcurrency: usize,
+    pub maxconcurrency: usize,
 
     pub mongodburi: String,
     pub mongodbdatabase: String,
@@ -28,7 +28,7 @@ pub fn load_config() -> Result<AppConfig, ConfigError> {
     config.kafkabootstrapservers = env::var("KAFKABOOTSTRAPSERVERS")?;
     config.kafkagroupid = env::var("KAFKAGROUPID")?;
     
-    config.maxConcurrency = env::var("MAXCONCURRENCY")
+    config.maxconcurrency = env::var("MAXCONCURRENCY")
         .unwrap_or_else(|_| String::from("1"))
         .parse()
         .map_err(|e| ConfigError::ParseError(format!("Invalid batch size: {}", e)))?;

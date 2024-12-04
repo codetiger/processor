@@ -1,13 +1,16 @@
 use rdkafka::config::ClientConfig;
-use rdkafka::consumer::{CommitMode, Consumer, StreamConsumer};
+use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::error::KafkaError;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::Message;
-use rdkafka::message::BorrowedMessage;
 use std::time::Duration;
 use futures::StreamExt;
 use tracing::{trace, debug, error, warn, info, instrument};
 use serde_json::Error as JsonError;
+
+use tokio::sync::Semaphore;
+use tokio::task::JoinSet;
+use std::sync::Arc;
 
 use crate::config::config::*;
 use core_data::models::workflow::Workflow;
@@ -26,18 +29,28 @@ pub enum ProcessorError {
 
 type ProcessResult<T> = Result<T, ProcessorError>;
 
+#[derive(Debug)]
+struct MessageMetadata {
+    topic: String,
+    partition: i32,
+    offset: i64,
+    key: Vec<u8>,
+}
+
 pub struct Processor {
-    consumer: StreamConsumer,
+    consumer: Arc<StreamConsumer>,
     producer: FutureProducer,
     config: AppConfig,
-    workflows: Vec<Workflow>,
+    workflows: Arc<Vec<Workflow>>,
+    semaphore: Arc<Semaphore>,
 }
 
 impl Processor {
     #[instrument(skip(config, workflows), fields(group_id = %config.kafkagroupid))]
     pub fn new(config: AppConfig, workflows: Vec<Workflow>) -> ProcessResult<Self> {
-        let consumer = Self::create_consumer(&config)?;
+        let consumer = Arc::new(Self::create_consumer(&config)?);
         let producer = Self::create_producer(&config)?;
+        let semaphore = Arc::new(Semaphore::new(config.maxconcurrency));
 
         let input_topics: Vec<&str> = workflows.iter()
             .map(|w| w.input_topic.as_str())
@@ -47,14 +60,16 @@ impl Processor {
             .subscribe(&input_topics)
             .map_err(ProcessorError::KafkaError)?;
 
-            Ok(Self {
-                consumer,
-                producer,
-                config,
-                workflows
-            })
-        }
+        Ok(Self {
+            consumer,
+            producer,
+            config,
+            workflows: Arc::new(workflows),
+            semaphore,
+        })
+    }
 
+    #[instrument(skip(config), fields(bootstrap_servers = %config.kafkabootstrapservers))]
     fn create_consumer(config: &AppConfig) -> ProcessResult<StreamConsumer> {
         ClientConfig::new()
             .set("group.id", &config.kafkagroupid)
@@ -65,6 +80,7 @@ impl Processor {
             .map_err(ProcessorError::KafkaError)
     }
 
+    #[instrument(skip(config), fields(bootstrap_servers = %config.kafkabootstrapservers))]
     fn create_producer(config: &AppConfig) -> ProcessResult<FutureProducer> {
         ClientConfig::new()
             .set("bootstrap.servers", &config.kafkabootstrapservers)
@@ -73,45 +89,63 @@ impl Processor {
             .map_err(ProcessorError::KafkaError)
     }
 
+    #[instrument(skip(self), fields(max_concurrency = %self.config.maxconcurrency))]
     pub async fn run(&self) -> ProcessResult<()> {
-        info!("Starting batch processor");
         let mut message_stream = self.consumer.stream();
-
+        let mut tasks: JoinSet<Result<(), ProcessorError>> = JoinSet::new();
+    
         loop {
-            tokio::select! {
-                Some(message_result) = message_stream.next() => {
-                    match message_result {
-                        Ok(message) => {
-                            let payload = message.payload().unwrap_or_default();
-                            match self.process_message(payload).await {
-                                Ok(processed) => {
+            if tasks.len() < self.config.maxconcurrency {
+                tokio::select! {
+                    Some(message_result) = message_stream.next() => {
+                        match message_result {
+                            Ok(message) => {
+                                let permit = self.semaphore.clone().acquire_owned().await.unwrap();
+                                let workflows = self.workflows.clone();
+                                let producer = self.producer.clone();
+                                let consumer = self.consumer.clone();
+                                let payload = message.payload().unwrap_or_default().to_vec();
+                                
+                                let metadata = MessageMetadata {
+                                    topic: message.topic().to_string(),
+                                    partition: message.partition(),
+                                    offset: message.offset(),
+                                    key: message.key().unwrap_or_default().to_vec(),
+                                };
+    
+                                tasks.spawn(async move {
+                                    let _permit = permit;
+                                    let processed = Self::process_message(&payload, &workflows).await?;
+                                    
                                     let headers = rdkafka::message::OwnedHeaders::new();
-                                    self.publish_message("message_updates", &message, processed, headers).await?;
-                                    self.consumer.commit_message(&message, CommitMode::Async)?;
-                                }
-                                Err(e) => {
-                                    error!(
-                                        error = %e,
-                                        offset = message.offset(),
-                                        partition = message.partition(),
-                                        topic = message.topic(),
-                                        "Failed to process message"
-                                    );
-                                }
+                                    Self::publish_message(&producer, "message_updates", &metadata.key, processed, headers).await?;
+                                    Self::commit_message(&consumer, &metadata).await?;
+
+                                    Ok(())
+                                });
                             }
+                            Err(e) => error!("Error receiving message: {}", e),
                         }
-                        Err(e) => {
-                            error!("Error receiving message: {}", e);
-                            continue;
+                    }
+                    Some(result) = tasks.join_next() => {
+                        if let Err(e) = result {
+                            error!("Task joined with error: {}", e);
                         }
+                    }
+                }
+            } else {
+                if let Some(result) = tasks.join_next().await {
+                    if let Err(e) = result {
+                        error!("Task joined with error: {}", e);
                     }
                 }
             }
         }
     }
 
-    #[instrument(skip(self, msg), fields(msg_size = msg.len()))]
-    pub async fn process_message(&self, msg: &[u8]) -> Result<Vec<u8>, ProcessorError> {
+
+    #[instrument(skip(msg, workflows), fields(msg_size = msg.len(), workflow_count = workflows.len()))]
+    async fn process_message(msg: &[u8], workflows: &[Workflow]) -> Result<Vec<u8>, ProcessorError> {
         let start = std::time::Instant::now();
 
         if msg.is_empty() {
@@ -134,7 +168,7 @@ impl Processor {
         );
 
         let mut workflow_executed = false;
-        for workflow in self.workflows.iter() {
+        for workflow in workflows.iter() {
             if message.workflow_match(&workflow.tenant, &workflow.origin, &workflow.condition) {
                 debug!(
                     workflow_id = %workflow.id,
@@ -176,15 +210,16 @@ impl Processor {
         })
     }
 
-    pub async fn publish_message(&self, topic: &str, original_message: &BorrowedMessage<'_>, processed_message: Vec<u8>, headers: rdkafka::message::OwnedHeaders,) -> ProcessResult<()> {
+    #[instrument(skip(producer, processed_message), fields(topic = %topic, message_size = %processed_message.len()))]
+    async fn publish_message(producer: &FutureProducer, topic: &str, key: &[u8], processed_message: Vec<u8>, headers: rdkafka::message::OwnedHeaders,) -> ProcessResult<()> {
         trace!(
             message_size = processed_message.len(),
             "Producing processed message"
         );
-        match self.producer.send(
+        match producer.send(
                 FutureRecord::to(&topic)
                     .payload(&processed_message)
-                    .key(original_message.key().unwrap_or_default())
+                    .key(key)
                     .headers(headers),
                 Duration::from_secs(5),
             )
@@ -206,4 +241,37 @@ impl Processor {
             }
         }
     }
+
+    #[instrument(skip(consumer), fields(topic = %metadata.topic, partition = %metadata.partition, offset = %metadata.offset))]
+    async fn commit_message(consumer: &StreamConsumer, metadata: &MessageMetadata) -> ProcessResult<()> {
+        trace!(
+            topic = %metadata.topic,
+            partition = metadata.partition,
+            offset = metadata.offset,
+            "Committing message offset"
+        );
+
+        match consumer.store_offset(&metadata.topic, metadata.partition, metadata.offset) {
+            Ok(_) => {
+                info!(
+                    topic = %metadata.topic,
+                    partition = metadata.partition,
+                    offset = metadata.offset,
+                    "Offset committed successfully"
+                );
+                Ok(())
+            },
+            Err(e) => {
+                error!(
+                    error = %e,
+                    topic = %metadata.topic,
+                    partition = metadata.partition,
+                    offset = metadata.offset,
+                    "Failed to commit offset"
+                );
+                Err(ProcessorError::KafkaError(e))
+            }
+        }
+    }
 }
+

@@ -1,11 +1,28 @@
 mod initiate;
 mod config;
 
-use actix_web::{web, App, HttpServer};
+use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use tracing::{debug, error, info, instrument};
 use crate::initiate::initiate_message;
 use crate::config::config::load_config;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use serde::Serialize;
+
+#[derive(Serialize)]
+struct HealthResponse {
+    status: String,
+    timestamp: String,
+}
+
+#[get("/health")]
+async fn health_check() -> impl Responder {
+    let health_status = HealthResponse {
+        status: "UP".to_string(),
+        timestamp: chrono::Utc::now().to_rfc3339(),
+    };
+
+    HttpResponse::Ok().json(health_status)
+}
 
 #[instrument(name = "startup")]
 #[actix_web::main]
@@ -59,6 +76,7 @@ async fn main() -> std::io::Result<()> {
         debug!("Initializing new worker");
         App::new()
             .app_data(web_config.clone())
+            .service(health_check)
             .service(web::resource("/initiate").to(initiate_message))
             .wrap(actix_web::middleware::Logger::default())
             .wrap(actix_web::middleware::Compress::default())

@@ -8,6 +8,31 @@ use tokio;
 use tracing::{debug, error, info, instrument, warn};
 use crate::config::config::*;
 use uuid::Uuid;
+use lazy_static::lazy_static;
+use std::sync::Mutex;
+
+lazy_static! {
+    static ref KAFKA_PRODUCER: Mutex<Option<FutureProducer>> = Mutex::new(None);
+}
+
+fn get_or_init_producer(config: &AppConfig) -> Result<FutureProducer, String> {
+    let mut producer = KAFKA_PRODUCER.lock().unwrap();
+    
+    if producer.is_none() {
+        let new_producer = ClientConfig::new()
+            .set("bootstrap.servers", &config.kafkabootstrapservers)
+            .set("message.timeout.ms", &config.kafkamessagetimeoutms)
+            .create()
+            .map_err(|e| {
+                error!(error = %e, "Failed to create Kafka producer");
+                format!("Producer creation error: {}", e)
+            })?;
+            
+        *producer = Some(new_producer);
+    }
+    
+    Ok(producer.as_ref().unwrap().clone())
+}
 
 #[derive(Serialize)]
 #[serde(untagged)] 
@@ -26,14 +51,7 @@ async fn publish_to_kafka(message: &Message, config: &AppConfig) -> Result<(), S
         "Creating Kafka producer"
     );
 
-    let producer: FutureProducer = ClientConfig::new()
-        .set("bootstrap.servers", &config.kafkabootstrapservers)
-        .set("message.timeout.ms", &config.kafkamessagetimeoutms)
-        .create()
-        .map_err(|e| {
-            error!(error = %e, "Failed to create Kafka producer");
-            format!("Producer creation error: {}", e)
-        })?;
+    let producer = get_or_init_producer(&config)?;
 
     let json_string = serde_json::to_string(&message)
         .map_err(|e| {
